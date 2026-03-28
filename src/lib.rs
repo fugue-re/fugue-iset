@@ -9,10 +9,13 @@
 //! [IntervalSet](struct.IntervalSet.html) is a newtype over [IntervalMap](struct.IntervalMap.html) with empty values.
 //!
 //! ## Features
-//! By default, `iset` is `no_std`.
-//! Three optional features are:
+//! By default, `fugue-iset` is `no_std`.
+//! Four optional features are:
 //! - `std`: no additional effects,
 //! - `serde`: Serialization/Deserialization (requires `std` environment),
+//! - `rkyv`: Zero-copy deserialization via [rkyv](https://docs.rs/rkyv) (works with `no_std`).
+//!   Note: `usize` fields are serialized as `u32` by default; enable rkyv's `pointer_width_64`
+//!   feature if 64-bit pointer width is needed.
 //! - `dot`: allows to write interval maps and sets to .dot files (requires `std`).
 
 #![no_std]
@@ -59,6 +62,7 @@ pub use set::IntervalSet;
 pub use entry::Entry;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 struct Interval<T> {
     start: T,
     end: T,
@@ -150,8 +154,9 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Interval<T> {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 struct Node<T, V, Ix> {
     interval: Interval<T>,
     subtree_interval: Interval<T>,
@@ -252,7 +257,7 @@ fn check_ordered<T: PartialOrd, R: RangeBounds<T>>(range: &R) {
 ///
 /// # Example
 ///```rust
-/// let mut map = iset::interval_map!{ 20..30 => 'a', 15..25 => 'b', 10..20 => 'c' };
+/// let mut map = fugue_iset::interval_map!{ 20..30 => 'a', 15..25 => 'b', 10..20 => 'c' };
 /// assert_eq!(map.insert(10..20, 'd'), Some('c'));
 /// assert_eq!(map.insert(5..15, 'e'), None);
 ///
@@ -336,7 +341,7 @@ fn check_ordered<T: PartialOrd, R: RangeBounds<T>>(range: &R) {
 ///
 /// Every node in the tree stores three indices (to the parent and two children), and as a result, memory usage can be
 /// reduced by reducing index sizes. In most cases, number of items in the map does not exceed `u32::MAX`, therefore
-/// we store indices as `u32` numbers by default (`iset::DefaultIx = u32`).
+/// we store indices as `u32` numbers by default (`fugue_iset::DefaultIx = u32`).
 /// You can use four integer types (`u8`, `u16`, `u32` or `u64`) as index types.
 /// Number of elements in the interval map cannot exceed `IndexType::MAX - 1`: for example a map with `u8` indices
 /// can store up to 255 items.
@@ -347,7 +352,7 @@ fn check_ordered<T: PartialOrd, R: RangeBounds<T>>(range: &R) {
 ///
 /// An interval map can be created using the following methods:
 /// ```rust
-/// use iset::{interval_map, IntervalMap};
+/// use fugue_iset::{interval_map, IntervalMap};
 ///
 /// // Creates an empty interval map with the default index type (u32):
 /// let mut map = IntervalMap::new();
@@ -381,7 +386,7 @@ fn check_ordered<T: PartialOrd, R: RangeBounds<T>>(range: &R) {
 /// IntervalMap implements [Entry](entry/enum.Entry.html), for updating and inserting values
 /// directly after search was made.
 /// ```
-/// let mut map = iset::IntervalMap::new();
+/// let mut map = fugue_iset::IntervalMap::new();
 /// map.entry(0..100).or_insert("abc".to_string());
 /// map.entry(100..200).or_insert_with(|| "def".to_string());
 /// let val = map.entry(200..300).or_insert(String::new());
@@ -410,6 +415,7 @@ fn check_ordered<T: PartialOrd, R: RangeBounds<T>>(range: &R) {
 /// [from_sorted](#method.from_sorted), [itertools::merge](https://docs.rs/itertools/latest/itertools/fn.merge.html)
 /// and [Iterator::partition](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.partition) in linear time.
 #[derive(Clone)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct IntervalMap<T, V, Ix: IndexType = DefaultIx> {
     nodes: Vec<Node<T, V, Ix>>,
     // true if the node is red, false if black.
@@ -743,7 +749,7 @@ impl<T: PartialOrd + Copy, V, Ix: IndexType> IntervalMap<T, V, Ix> {
 
     /// Gets the given key's corresponding entry in the map for in-place manipulation.
     /// ```
-    /// let mut counts = iset::IntervalMap::new();
+    /// let mut counts = fugue_iset::IntervalMap::new();
     /// for x in [0..5, 3..9, 2..6, 0..5, 2..6, 2..6] {
     ///     counts.entry(x).and_modify(|curr| *curr += 1).or_insert(1);
     /// }
@@ -798,7 +804,7 @@ impl<T: PartialOrd + Copy, V, Ix: IndexType> IntervalMap<T, V, Ix> {
     /// </pre></div>
     ///
     /// ```rust
-    /// let mut map = iset::interval_map!{};
+    /// let mut map = fugue_iset::interval_map!{};
     /// map.force_insert(10..20, 1);
     /// map.force_insert(15..25, 2);
     /// map.force_insert(20..30, 3);
@@ -882,7 +888,7 @@ impl<T: PartialOrd + Copy, V, Ix: IndexType> IntervalMap<T, V, Ix> {
     ///
     /// # Examples
     /// ```rust
-    /// let mut map = iset::IntervalMap::new();
+    /// let mut map = fugue_iset::IntervalMap::new();
     /// map.force_insert(5..15, 0);
     /// map.force_insert(10..20, 1);
     /// map.force_insert(10..20, 2);
@@ -1012,7 +1018,7 @@ impl<T: PartialOrd + Copy, V, Ix: IndexType> IntervalMap<T, V, Ix> {
     /// Equivalent to `map.iter(query).next().is_some()`, but much faster.
     ///
     /// ```rust
-    /// let map = iset::interval_map!{ 5..8 => 'a', 10..15 => 'b' };
+    /// let map = fugue_iset::interval_map!{ 5..8 => 'a', 10..15 => 'b' };
     /// assert!(!map.has_overlap(8..10));
     /// assert!(map.has_overlap(8..=10));
     /// ```
@@ -1294,7 +1300,7 @@ where T: PartialOrd + Copy + Default + AddAssign + Sub<Output = T>,
     /// This also means that the size of the interval *(0, 1)* will be 1 even for integer types.
     ///
     /// ```rust
-    /// let map = iset::interval_map!{ 0..10 => 'a', 4..8 => 'b', 12..15 => 'c' };
+    /// let map = fugue_iset::interval_map!{ 0..10 => 'a', 4..8 => 'b', 12..15 => 'c' };
     /// assert_eq!(map.covered_len(2..14), 10);
     /// assert_eq!(map.covered_len(..), 13);
     /// ```
@@ -1479,7 +1485,7 @@ where
 
 /// Macros for [IntervalMap](struct.IntervalMap.html) creation.
 /// ```rust
-/// use iset::interval_map;
+/// use fugue_iset::interval_map;
 ///
 /// let map = interval_map!{ 0..10 => "a", 5..15 => "b", -5..20 => "c" };
 /// let a: Vec<_> = map.iter(..).collect();
@@ -1525,7 +1531,7 @@ macro_rules! interval_map {
 
 /// Macros for [IntervalSet](set/struct.IntervalSet.html) creation.
 /// ```rust
-/// use iset::interval_set;
+/// use fugue_iset::interval_set;
 ///
 /// let set = interval_set!{ 100..210, 50..150 };
 /// let a: Vec<_> = set.iter(..).collect();

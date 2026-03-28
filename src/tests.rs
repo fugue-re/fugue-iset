@@ -1,4 +1,4 @@
-// NOTE: Run tests with `cargo test --features std,dot,serde`.
+// NOTE: Run tests with `cargo test --features std,dot,serde,rkyv`.
 
 use std::{
     println,
@@ -532,6 +532,19 @@ fn test_serde() {
 
     let input = File::open(json_path).unwrap();
     let tree2: IntervalMap<i32, u32> = serde_json::from_reader(input).unwrap();
+    compare_iterators(tree.iter(..), tree2.iter(..), &history);
+}
+
+#[cfg(feature = "rkyv")]
+#[test]
+fn test_rkyv() {
+    const COUNT: u32 = 1000;
+    let mut naive = NaiveIntervalMap::new();
+    let mut tree = IntervalMap::<i32, u32>::new();
+    let history = random_inserts(&mut naive, &mut tree, COUNT, generate_range(generate_int(0, 10000)));
+
+    let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&tree).unwrap();
+    let tree2 = rkyv::from_bytes::<IntervalMap<i32, u32>, rkyv::rancor::Error>(&bytes).unwrap();
     compare_iterators(tree.iter(..), tree2.iter(..), &history);
 }
 

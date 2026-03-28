@@ -20,7 +20,7 @@ use super::{
 /// See [IntervalMap](../struct.IntervalMap.html) for more information.
 ///
 /// ```rust
-/// use iset::interval_set;
+/// use fugue_iset::interval_set;
 /// let mut set = interval_set!{ 0.4..1.5, 0.1..0.5, 5.0..7.0 };
 /// assert!(set.insert(-1.0..0.2));
 /// // false because the interval is already in the set.
@@ -59,6 +59,7 @@ use super::{
 /// In contrast to the [IntervalMap](../struct.IntervalMap.html), `IntervalSet` does not have a
 /// [force_insert](../struct.IntervalMap.html#method.force_insert), and completely forbids duplicate intervals.
 #[derive(Clone)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct IntervalSet<T, Ix: IndexType = DefaultIx> {
     inner: IntervalMap<T, (), Ix>,
 }
