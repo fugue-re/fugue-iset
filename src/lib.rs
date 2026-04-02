@@ -1414,7 +1414,7 @@ impl<T, V, Ix> Serialize for IntervalMap<T, V, Ix>
             }
         }
 
-        let mut tup = serializer.serialize_tuple(2)?;
+        let mut tup = serializer.serialize_tuple(3)?;
         tup.serialize_element(&NodeVecSer(&self.nodes))?;
         tup.serialize_element(&self.colors)?;
         tup.serialize_element(&self.root)?;
